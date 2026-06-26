@@ -1,0 +1,98 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+
+- stage: Build_Test
+  displayName: "Build & Test"
+  jobs:
+    - job: Build
+      displayName: "Build & Test API"
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+        - checkout: self
+
+        - task: UseDotNet@2
+          inputs:
+            packageType: 'sdk'
+            version: '8.x'
+
+        - script: dotnet restore src/SampleApi/SampleApi.csproj
+          displayName: "Restore Dependencies"
+
+        - script: dotnet build src/SampleApi/SampleApi.csproj --configuration $(buildConfiguration)
+          displayName: "Build Solution"
+
+        - script: dotnet test tests/SampleApi.Tests/SampleApi.Tests.csproj --logger trx
+          displayName: "Run Unit Tests"
+
+        - task: PublishTestResults@2
+          inputs:
+            testResultsFormat: 'VSTest'
+            testResultsFiles: '**/*.trx'
+            failTaskOnFailedTests: true
+
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathToPublish: '$(Build.SourcesDirectory)/src/SampleApi/bin/$(buildConfiguration)/net8.0'
+            artifactName: 'drop'
+
+- stage: Deploy_DEV
+  displayName: "Deploy to DEV"
+  dependsOn: Build_Test
+  condition: succeeded()
+  jobs:
+    - deployment: DeployDev
+      displayName: "Deploy to DEV"
+      environment: 'DEV'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: drop
+
+              - script: echo "Deploying to DEV..."
+                displayName: "DEV Deployment Script"
+
+- stage: Deploy_QA
+  displayName: "Deploy to QA"
+  dependsOn: Deploy_DEV
+  condition: succeeded()
+  jobs:
+    - deployment: DeployQA
+      displayName: "Deploy to QA"
+      environment: 'QA'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: drop
+
+              - script: echo "Deploying to QA..."
+                displayName: "QA Deployment Script"
+
+- stage: Deploy_PROD
+  displayName: "Deploy to PROD"
+  dependsOn: Deploy_QA
+  condition: succeeded()
+  jobs:
+    - deployment: DeployProd
+      displayName: "Deploy to PROD"
+      environment: 'PROD'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: drop
+
+              - script: echo "Deploying to PROD..."
+                displayName: "PROD Deployment Script"
