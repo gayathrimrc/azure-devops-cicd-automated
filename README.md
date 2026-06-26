@@ -12,7 +12,10 @@ This repository demonstrates a complete Azure DevOps multi‑stage CI/CD pipelin
 - Azure DevOps Pipelines (YAML)
 - Multi‑stage Environments
 
-## Pipeline File
-See `azure-pipelines.yml`.
-
 ## Run Locally
+dotnet restore
+dotnet build
+dotnet run --project src/SampleApi
+
+## Test
+dotnet test
